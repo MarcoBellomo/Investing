@@ -135,8 +135,8 @@ function formatNameWithEmoji(name, variazione) {
         if (time && last && pcp) {
           let symbol = "⬜"; 
           const name = pidMap[pid] || "N/A";
-          if (last_dir === "greenBg") symbol = "🟢";
-          else if (last_dir === "redBg") symbol = "🔴";
+          if (last_dir === "greenBg") symbol = "🟩"; // 🟢
+          else if (last_dir === "redBg") symbol = "🟥"; // 🔴
 
           if (symbol === "⬜") {
             return;
