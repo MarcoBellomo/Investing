@@ -128,12 +128,12 @@ function formatNameWithEmoji(name, variazione) {
 
       if (!trackedPids.includes(pid)) continue;
 
-      try {
+      try { 
         const payload = JSON.parse(payloadStr);
         const { time, last, pcp, pc, turnover_numeric,last_dir } = payload;
 
         if (time && last && pcp) {
-          let symbol = "⬜";
+          let symbol = "⬜"; 
           const name = pidMap[pid] || "N/A";
           if (last_dir === "greenBg") symbol = "🟢";
           else if (last_dir === "redBg") symbol = "🔴";
