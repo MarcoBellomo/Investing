@@ -24,7 +24,16 @@ function padToLength(str, targetLength) {
   return str + " ".repeat(targetLength - currentLength);
 }
 
-function logEvent({ time, pid, displayName, last, pcp, pc, turnover_numeric, symbol }) {
+function logEvent({
+  time,
+  pid,
+  displayName,
+  last,
+  pcp,
+  pc,
+  turnover_numeric,
+  symbol,
+}) {
   const paddedTime = time.padEnd(9);
   const paddedPid = pid.toString().padEnd(7);
   const paddedName = padToLength(displayName, 45);
@@ -48,7 +57,8 @@ function formatNameWithEmoji(name, variazione) {
   } else if (name.toUpperCase().includes("FUTURE EURO")) {
     return `⏩📉💶 \x1b[36m${name}\x1b[0m`; // ciano
   } else if (name.toUpperCase().includes("FUTURE BTP ITALIANI")) {
-    const coloreSfondo = variazione === "greenBg" ? "\x1b[1;37;42m" : "\x1b[1;37;41m";
+    const coloreSfondo =
+      variazione === "greenBg" ? "\x1b[1;37;42m" : "\x1b[1;37;41m";
     return `⏩📉💶 ${coloreSfondo}${name}\x1b[0m`;
     // return `⏩📉💶 ${coloreSfondo};37m${name}\x1b[0m`; // grassetto + bianco su rosso
     // return `⏩📉💶 \x1b[37m\x1b[40m${name}\x1b[0m`; // bianco su sfondo nero
@@ -128,12 +138,12 @@ function formatNameWithEmoji(name, variazione) {
 
       if (!trackedPids.includes(pid)) continue;
 
-      try { 
+      try {
         const payload = JSON.parse(payloadStr);
-        const { time, last, pcp, pc, turnover_numeric,last_dir } = payload;
+        const { time, last, pcp, pc, turnover_numeric, last_dir } = payload;
 
         if (time && last && pcp) {
-          let symbol = "⬜"; 
+          let symbol = "⬜";
           const name = pidMap[pid] || "N/A";
           if (last_dir === "greenBg") symbol = "🟩"; // 🟢
           else if (last_dir === "redBg") symbol = "🟥"; // 🔴
@@ -144,14 +154,32 @@ function formatNameWithEmoji(name, variazione) {
 
           let displayName = formatNameWithEmoji(name, last_dir);
 
-          logEvent({ time, pid, displayName, last, pcp, pc, turnover_numeric, symbol });
+          logEvent({
+            time,
+            pid,
+            displayName,
+            last,
+            pcp,
+            pc,
+            turnover_numeric,
+            symbol,
+          });
 
           // console.log(
           //   `[📈] ${time} | ${pid} (${displayName}) → ${last} (${pcp}) ${symbol}`
           // );
 
           // Salva nel db
-          await saveEventToDB({ pid, name, last, pcp, last_dir, time, pc, turnover_numeric });
+          await saveEventToDB({
+            pid,
+            name,
+            last,
+            pcp,
+            last_dir,
+            time,
+            pc,
+            turnover_numeric,
+          });
         }
       } catch {
         continue;
