@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "mssql": "^11.0.1",
+    "puppeteer": "^24.4.0",
+    "ws": "^8.18.1"
+  }
+}
