@@ -4,8 +4,8 @@ async function saveEventToDB(event) {
   try {
     const pool = await getConnection();
     const query = `
-      INSERT INTO PIDEvents (pid, name, price, percentage_change, direction, time_str, change, volume)
-      VALUES (@pid, @name, @price, @pcp, @direction, @time, @pc, @turnover_numeric)
+      INSERT INTO PIDEvents (pid, name, price, percentage_change, direction, time_str, change, volume, timestamp_utc)
+      VALUES (@pid, @name, @price, @pcp, @direction, @time, @pc, @turnover_numeric, GETDATE())
     `;
 
     await pool.request()

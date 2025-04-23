@@ -43,7 +43,7 @@ function logEvent({
   const paddedturnover_numeric = `(${turnover_numeric})`.padStart(15);
 
   console.log(
-    `[📈] ${paddedTime} | ${paddedPid} (${paddedName}) → ${paddedLast} ${paddedPcp} ${paddedPc} ${paddedturnover_numeric} ${symbol}`
+    `-> ${symbol} <- [📈] ${paddedTime} | ${paddedPid} (${paddedName}) → ${paddedLast} ${paddedPcp} ${paddedPc} ${paddedturnover_numeric}`
   );
 }
 
