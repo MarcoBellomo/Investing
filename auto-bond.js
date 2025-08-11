@@ -34,8 +34,8 @@ function logEvent({
   turnover_numeric,
   symbol,
 }) {
-  // const paddedTime = time.padEnd(9);
-  const paddedDateTime = `${dateStr} ${time}`.padEnd(19);
+  const paddedTime = time.padEnd(9);
+//  const paddedDateTime = `${dateStr} ${time}`.padEnd(19);
   const paddedPid = pid.toString().padEnd(7);
   const paddedName = padToLength(displayName, 45);
   const paddedLast = last.toString().padStart(8);
@@ -44,7 +44,7 @@ function logEvent({
   const paddedturnover_numeric = `(${turnover_numeric})`.padStart(15);
 
   console.log(
-    `-> ${symbol} <- [📈] ${paddedDateTime} | ${paddedPid} (${paddedName}) → ${paddedLast} ${paddedPcp} ${paddedPc} ${paddedturnover_numeric}`
+    `-> ${symbol} <- [📈] ${paddedTime} | ${paddedPid} (${paddedName}) → ${paddedLast} ${paddedPcp} ${paddedPc} ${paddedturnover_numeric}`
   );
 }
 

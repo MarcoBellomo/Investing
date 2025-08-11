@@ -1,2 +1,3 @@
 node_modules
 logs/bond.log
+bond.pid
