@@ -35,7 +35,6 @@ function logEvent({
   symbol,
 }) {
   const paddedTime = time.padEnd(9);
-//  const paddedDateTime = `${dateStr} ${time}`.padEnd(19);
   const paddedPid = pid.toString().padEnd(7);
   const paddedName = padToLength(displayName, 45);
   const paddedLast = last.toString().padStart(8);
@@ -61,13 +60,46 @@ function formatNameWithEmoji(name, variazione) {
     const coloreSfondo =
       variazione === "greenBg" ? "\x1b[1;37;42m" : "\x1b[1;37;41m";
     return `⏩📉💶 ${coloreSfondo}${name}\x1b[0m`;
-    // return `⏩📉💶 ${coloreSfondo};37m${name}\x1b[0m`; // grassetto + bianco su rosso
-    // return `⏩📉💶 \x1b[37m\x1b[40m${name}\x1b[0m`; // bianco su sfondo nero
   } else if (name.toUpperCase().includes("UNITED STATES")) {
     return `⏩📉💲 \x1b[36m${name}\x1b[0m`; // ciano
   }
   return name;
 }
+
+// ======= AGGIUNTA: stato + helpers per reconnect =======
+let ws = null;
+let heartbeatTimer = null;
+let subscribeTimer = null;
+let reconnecting = false;
+
+function clearTimers() {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+  if (subscribeTimer) {
+    clearTimeout(subscribeTimer);
+    subscribeTimer = null;
+  }
+}
+
+function cleanupSocket() {
+  clearTimers();
+  try { ws && ws.removeAllListeners && ws.removeAllListeners(); } catch (_) {}
+  try { ws && ws.terminate && ws.terminate(); } catch (_) {}
+  ws = null;
+}
+
+function scheduleReconnect(reason) {
+  if (reconnecting) return;
+  reconnecting = true;
+  console.warn(`[WS] riconnessione immediata… ${reason ? `(${reason})` : ""}`);
+  cleanupSocket();
+  setTimeout(() => {
+    startWS().finally(() => { reconnecting = false; });
+  }, 0); // retry immediato
+}
+// ======= FINE AGGIUNTA =======
 
 (async () => {
   const pidMap = await getActivePIDsWithNames();
@@ -78,116 +110,128 @@ function formatNameWithEmoji(name, variazione) {
     return;
   }
 
-  const ws = new WebSocket(wsUrl, {
-    headers: {
-      Origin: "https://it.investing.com",
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
-    },
-  });
+  // incapsulo apertura e init per poterla riusare al reconnect
+  async function startWS() {
+    if (ws && ws.readyState === WebSocket.OPEN) return;
 
-  ws.on("open", () => {
-    console.log("[✔] WebSocket aperto");
+    ws = new WebSocket(wsUrl, {
+      headers: {
+        Origin: "https://it.investing.com",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+      },
+    });
 
-    ws.send(JSON.stringify({ _event: "UID", UID: 259333371 }));
-    console.log("[→] UID inviato");
+    ws.on("open", () => {
+      console.log("[✔] WebSocket aperto");
 
-    setTimeout(() => {
-      const messageString =
-        trackedPids.map((pid) => `pid-${pid}`).join(":%%") + ":";
-      ws.send(
-        JSON.stringify({
-          _event: "bulk-subscribe",
-          tzID: 8,
-          message: messageString,
-        })
-      );
-      console.log("[→] Sottoscrizione inviata ai PID:", trackedPids.join(", "));
-    }, 1000);
+      ws.send(JSON.stringify({ _event: "UID", UID: 259333371 }));
+      console.log("[→] UID inviato");
 
-    setInterval(() => {
-      const heartbeat = JSON.stringify({ _event: "heartbeat", data: "h" });
-      ws.send(heartbeat);
-      console.log("[💓] Heartbeat inviato");
-    }, 5 * 60 * 1000);
-  });
+      subscribeTimer = setTimeout(() => {
+        const messageString =
+          trackedPids.map((pid) => `pid-${pid}`).join(":%%") + ":";
+        ws.send(
+          JSON.stringify({
+            _event: "bulk-subscribe",
+            tzID: 8,
+            message: messageString,
+          })
+        );
+        console.log("[→] Sottoscrizione inviata ai PID:", trackedPids.join(", "));
+      }, 1000);
 
-  ws.on("message", async (data) => {
-    const raw = data.toString();
-
-    if (!raw.startsWith("a[")) return;
-
-    let payloadList;
-    try {
-      payloadList = JSON.parse(raw.slice(1));
-    } catch {
-      return;
-    }
-
-    for (const item of payloadList) {
-      let messageObj;
-      try {
-        messageObj = JSON.parse(item);
-      } catch {
-        continue;
-      }
-
-      if (!messageObj.message || !messageObj.message.includes("pid-")) continue;
-
-      const [pidRaw, payloadStr] = messageObj.message.split("::");
-      const pid = pidRaw.replace("pid-", "");
-
-      if (!trackedPids.includes(pid)) continue;
-
-      try {
-        const payload = JSON.parse(payloadStr);
-        const { time, last, pcp, pc, turnover_numeric, last_dir } = payload;
-
-        if (time && last && pcp) {
-          let symbol = "⬜";
-          const name = pidMap[pid] || "N/A";
-          if (last_dir === "greenBg") symbol = "🟩"; // 🟢
-          else if (last_dir === "redBg") symbol = "🟥"; // 🔴
-
-          if (symbol === "⬜") {
-            return;
-          }
-
-          let displayName = formatNameWithEmoji(name, last_dir);
-
-          logEvent({
-            time,
-            pid,
-            displayName,
-            last,
-            pcp,
-            pc,
-            turnover_numeric,
-            symbol,
-          });
-
-          // console.log(
-          //   `[📈] ${time} | ${pid} (${displayName}) → ${last} (${pcp}) ${symbol}`
-          // );
-
-          // Salva nel db
-          await saveEventToDB({
-            pid,
-            name,
-            last,
-            pcp,
-            last_dir,
-            time,
-            pc,
-            turnover_numeric,
-          });
+      heartbeatTimer = setInterval(() => {
+        const heartbeat = JSON.stringify({ _event: "heartbeat", data: "h" });
+        try {
+          ws.send(heartbeat);
+          console.log("[💓] Heartbeat inviato");
+        } catch (e) {
+          console.error("[!] Errore invio heartbeat:", e.message);
         }
-      } catch {
-        continue;
-      }
-    }
-  });
+      }, 5 * 60 * 1000);
+    });
 
-  ws.on("error", (err) => console.error("[!] Errore WebSocket:", err.message));
-  ws.on("close", () => console.log("[✘] Connessione chiusa"));
+    ws.on("message", async (data) => {
+      const raw = data.toString();
+      if (!raw.startsWith("a[")) return;
+
+      let payloadList;
+      try {
+        payloadList = JSON.parse(raw.slice(1));
+      } catch {
+        return;
+      }
+
+      for (const item of payloadList) {
+        let messageObj;
+        try {
+          messageObj = JSON.parse(item);
+        } catch {
+          continue;
+        }
+
+        if (!messageObj.message || !messageObj.message.includes("pid-")) continue;
+
+        const [pidRaw, payloadStr] = messageObj.message.split("::");
+        const pid = pidRaw.replace("pid-", "");
+
+        if (!trackedPids.includes(pid)) continue;
+
+        try {
+          const payload = JSON.parse(payloadStr);
+          const { time, last, pcp, pc, turnover_numeric, last_dir } = payload;
+
+          if (time && last && pcp) {
+            let symbol = "⬜";
+            const name = pidMap[pid] || "N/A";
+            if (last_dir === "greenBg") symbol = "🟩"; // 🟢
+            else if (last_dir === "redBg") symbol = "🟥"; // 🔴
+
+            if (symbol === "⬜") return;
+
+            let displayName = formatNameWithEmoji(name, last_dir);
+
+            logEvent({
+              time,
+              pid,
+              displayName,
+              last,
+              pcp,
+              pc,
+              turnover_numeric,
+              symbol,
+            });
+
+            await saveEventToDB({
+              pid,
+              name,
+              last,
+              pcp,
+              last_dir,
+              time,
+              pc,
+              turnover_numeric,
+            });
+          }
+        } catch {
+          continue;
+        }
+      }
+    });
+
+    ws.on("error", (err) => {
+      console.error("[!] Errore WebSocket:", err.message);
+      // chiudiamo per far scattare 'close' → scheduleReconnect
+      try { ws.close(); } catch (_) {}
+    });
+
+    ws.on("close", (code, reason) => {
+      console.log("[✘] Connessione chiusa", code, reason?.toString?.() || "");
+      scheduleReconnect(`close ${code}`);
+    });
+  }
+
+  // avvio iniziale
+  await startWS();
 })();
