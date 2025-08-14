@@ -90,15 +90,20 @@ function cleanupSocket() {
   ws = null;
 }
 
-function scheduleReconnect(reason) {
+function scheduleReconnect(reinitFn, reason) {
   if (reconnecting) return;
   reconnecting = true;
   console.warn(`[WS] riconnessione immediata… ${reason ? `(${reason})` : ""}`);
   cleanupSocket();
-  setTimeout(() => {
-    startWS().finally(() => { reconnecting = false; });
-  }, 0); // retry immediato
+  setTimeout(async () => {
+    try {
+      await reinitFn();   // <— richiama la funzione passata (es. startWS)
+    } finally {
+      reconnecting = false;
+    }
+  }, 0); // immediato; se vuoi ammorbidire: 300–1000 ms
 }
+
 // ======= FINE AGGIUNTA =======
 
 (async () => {
@@ -228,7 +233,7 @@ function scheduleReconnect(reason) {
 
     ws.on("close", (code, reason) => {
       console.log("[✘] Connessione chiusa", code, reason?.toString?.() || "");
-      scheduleReconnect(`close ${code}`);
+      scheduleReconnect(startWS, `close ${code}`); // <— passa la ref a startWS
     });
   }
 
